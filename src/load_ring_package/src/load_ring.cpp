@@ -1,17 +1,23 @@
 #include<ros/ros.h>
-#include<std_msgs/Bool.h>
+#include<std_msgs/Int16.h>
 #include<sensor_msgs/Joy.h>
 
-#define LOAD_RING_BUTTON 5 //R1ボタン
-#define CATCH_RING_BUTTON 4 //L1ボタン
+#define CLOSE_HAND_BUTTON 5 //R1ボタン
+#define OPEN_HAND_BUTTON 4 //L1ボタン
 
-bool isPressed = false;
-std_msgs::Bool arm_status_msg;
+std_msgs::Int16 arm_status_msg = 0;
 
 //ジョイコンのコールバック関数
 void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
 {
-    arm_status_msg.data = joy->buttons[LOAD_RING_BUTTON];
+    if(joy->buttons[OPEN_HAND_BUTTON]){
+        arm_status_msg.data = 1;
+    }
+    else if(joy->buttons[CLOSE_HAND_BUTTON]){
+        arm_status_msg.data = 2;
+    }else{
+        arm_status_msg.data = 0;
+    }
 }
 
 int main(int argc, char **argv)
@@ -27,7 +33,7 @@ int main(int argc, char **argv)
 
     
     //Arduinoにメッセージを送信
-    ros::Publisher pub = nh.advertise<std_msgs::Bool>("load_ring", 1);
+    ros::Publisher pub = nh.advertise<std_msgs::Int16>("hand_state", 1);
 
     //ROSのメインループを開始
     ros::Rate loop_rate(10);
