@@ -1,0 +1,8 @@
+prefix=/home/m/ABU2023_ws/install
+
+Name: load_ring_package
+Description: Description of load_ring_package
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
