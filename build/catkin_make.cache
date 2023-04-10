@@ -1,2 +1,0 @@
-load_ring_package
--DCATKIN_DEVEL_PREFIX=/home/m/ABU2023_ws/devel -DCMAKE_INSTALL_PREFIX=/home/m/ABU2023_ws/install -G Unix Makefiles
