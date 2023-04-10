@@ -1,3 +1,4 @@
+#undef ESP32
 #include<ros/ros.h>
 #include<std_msgs/Int16.h>
 #include<sensor_msgs/Joy.h>
@@ -5,7 +6,7 @@
 #define CLOSE_HAND_BUTTON 5 //R1ボタン
 #define OPEN_HAND_BUTTON 4 //L1ボタン
 
-std_msgs::Int16 arm_status_msg = 0;
+std_msgs::Int16 arm_status_msg;
 
 //ジョイコンのコールバック関数
 void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
