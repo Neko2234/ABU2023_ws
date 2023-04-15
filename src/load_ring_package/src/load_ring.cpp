@@ -11,10 +11,10 @@ std_msgs::Int16 arm_status_msg;
 //ジョイコンのコールバック関数
 void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
 {
-    if(joy->buttons[OPEN_HAND_BUTTON]){
+    if(joy->buttons[OPEN_HAND_BUTTON]==1 && joy->buttons[CLOSE_HAND_BUTTON]==0){
         arm_status_msg.data = 1;
     }
-    else if(joy->buttons[CLOSE_HAND_BUTTON]){
+    else if(joy->buttons[CLOSE_HAND_BUTTON]==1 && joy->buttons[OPEN_HAND_BUTTON]==0){
         arm_status_msg.data = 2;
     }else{
         arm_status_msg.data = 0;
