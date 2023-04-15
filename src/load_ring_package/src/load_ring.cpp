@@ -1,23 +1,33 @@
-#undef ESP32
 #include<ros/ros.h>
-#include<std_msgs/Int16.h>
+#include<fabot_msgs/ArmMsg.h>
 #include<sensor_msgs/Joy.h>
 
 #define CLOSE_HAND_BUTTON 5 //R1ボタン
 #define OPEN_HAND_BUTTON 4 //L1ボタン
+#define UP_ARM_BUTTON
+#define DOWN_ARM_BUTTON
 
-std_msgs::Int16 arm_status_msg;
+fabot_msgs::ArmMsg arm_state_msg;
 
 //ジョイコンのコールバック関数
 void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
 {
+    //両方押してるときは手は停止
     if(joy->buttons[OPEN_HAND_BUTTON]==1 && joy->buttons[CLOSE_HAND_BUTTON]==0){
-        arm_status_msg.data = 1;
-    }
-    else if(joy->buttons[CLOSE_HAND_BUTTON]==1 && joy->buttons[OPEN_HAND_BUTTON]==0){
-        arm_status_msg.data = 2;
+        arm_state_msg.hand = 1;
+    }else if(joy->buttons[CLOSE_HAND_BUTTON]==1 && joy->buttons[OPEN_HAND_BUTTON]==0){
+        arm_state_msg.hand = 2;
     }else{
-        arm_status_msg.data = 0;
+        arm_state_msg.hand = 0;
+    }
+
+    //両方押してるときは腕は停止
+    if(joy->buttons[UP_ARM_BUTTON]==1 && joy->buttons[DOWN_ARM_BUTTON]==0){
+        arm_state_msg.arm = 1;
+    }else if(joy->buttons[DOWN_ARM_BUTTON]==1 && joy->buttons[UP_ARM_BUTTON]==0){
+        arm_state_msg.arm = 2;
+    }else{
+        arm_state_msg.arm = 0;
     }
 }
 
@@ -42,7 +52,7 @@ int main(int argc, char **argv)
         ros::spinOnce();
         
         // Arduinoにメッセージを送信
-        pub.publish(arm_status_msg);
+        pub.publish(arm_state_msg);
 
         loop_rate.sleep();
     }
