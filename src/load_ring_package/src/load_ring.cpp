@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 
     
     //Arduinoにメッセージを送信
-    ros::Publisher pub = nh.advertise<std_msgs::Int16>("hand_state", 1);
+    ros::Publisher pub = nh.advertise<fabot_msgs::ArmMsg>("hand_state", 1);
 
     //ROSのメインループを開始
     ros::Rate loop_rate(10);
