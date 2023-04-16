@@ -4,8 +4,8 @@
 
 #define CLOSE_HAND_BUTTON 5 //R1ボタン
 #define OPEN_HAND_BUTTON 4 //L1ボタン
-#define UP_ARM_BUTTON
-#define DOWN_ARM_BUTTON
+#define UP_ARM_BUTTON 1
+#define DOWN_ARM_BUTTON 2
 
 fabot_msgs::ArmMsg arm_state_msg;
 
