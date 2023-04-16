@@ -4,8 +4,10 @@
 
 #define CLOSE_HAND_BUTTON 5 //R1ボタン
 #define OPEN_HAND_BUTTON 4 //L1ボタン
-#define UP_ARM_BUTTON 1
-#define DOWN_ARM_BUTTON 2
+#define UP_ARM_BUTTON 1 //右上ボタン
+#define DOWN_ARM_BUTTON 2 //右下ボタン
+#define HAND_DUTY 250 //Arduinoに指定するDuty
+#define ARM_DUTY 500
 
 fabot_msgs::ArmMsg arm_state_msg;
 
@@ -41,10 +43,13 @@ int main(int argc, char **argv)
 
     //ジョイコンのトピックを購読
     ros::Subscriber sub = nh.subscribe<sensor_msgs::Joy>("joy", 1, joyCallback);
-
     
     //Arduinoにメッセージを送信
     ros::Publisher pub = nh.advertise<fabot_msgs::ArmMsg>("hand_state", 1);
+    
+    //Dutyを設定
+    arm_state_msg.hand_duty = HAND_DUTY;
+    arm_state_msg.arm_duty = ARM_DUTY;
 
     //ROSのメインループを開始
     ros::Rate loop_rate(10);
