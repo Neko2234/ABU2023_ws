@@ -6,10 +6,10 @@
 #define STOP 0
 #define CW 1
 #define CCW 2
-#define ONE_WAY_TIME 1000  //ミリ秒
+#define ONE_WAY_TIME 3000  //ミリ秒
 #define STOP_TIME 1000
 
-int spr_duty = 100;
+int spr_duty = 800;
 unsigned long time_prev = 0;
 unsigned long time_now = 0;
 unsigned int dt = 0;
@@ -25,6 +25,7 @@ ros::NodeHandle nh;
 
 // トピックのコールバック関数
 void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
+  separate_pre_sign = separate_sign;
   separate_sign = spr_msg.isOn;
   spr_duty = spr_msg.duty;
 }
@@ -33,6 +34,8 @@ void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
 ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
 
 void setup() {
+  Serial
+    .begin(9600);
   // すべてのモータ，エンコーダの初期化
   Cubic::begin();
   nh.getHardware()->setBaud(9600);
@@ -45,6 +48,12 @@ void setup() {
 void loop() {
   nh.spinOnce();
   delay(30);
+  Serial.write(time_now);
+  Serial.write(",");
+  Serial.write(time_prev);
+  Serial.write(",");
+  Serial.writeln(dt);
+
 
   // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
   if (separate_sign && !separate_pre_sign) {
@@ -52,6 +61,7 @@ void loop() {
   }
 
   if (is_separating) {
+    digitalWrite(23, HIGH);
     time_now = micros() / 1000;
 
     if (!is_pausing) {
@@ -63,10 +73,12 @@ void loop() {
     dt = time_now - time_prev - pause_time;
 
     if (dt < ONE_WAY_TIME) {
+      digitalWrite(22, LOW);
       DC_motor::put(SPR_MOTOR, spr_duty);
     } else if (dt < ONE_WAY_TIME + STOP_TIME) {
       DC_motor::put(SPR_MOTOR, 0);
     } else if (dt < ONE_WAY_TIME * 2 + STOP_TIME) {
+      digitalWrite(22, LOW);
       DC_motor::put(SPR_MOTOR, -spr_duty);
     } else if (dt < ONE_WAY_TIME * 2 + STOP_TIME * 2) {
       DC_motor::put(SPR_MOTOR, 0);
@@ -75,6 +87,7 @@ void loop() {
       pause_time = 0;
     }
   } else {
+    digitalWrite(23, LOW);
     is_pausing = true;
     pause_start_time = time_now;
   }
