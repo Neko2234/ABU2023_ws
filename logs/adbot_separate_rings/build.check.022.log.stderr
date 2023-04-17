@@ -1,0 +1,7 @@
+[31m[1mCMake Error[0m at /home/m/ABU2023_ws/src/adbot_separate_rings/CMakeLists.txt:161 (add_dependencies):
+  The dependency target "adbot_separate_rings_generate_messages_cpp" of
+  target "separate_rings" does not exist.
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.
+make: *** [Makefile:574: cmake_check_build_system] エラー 1

@@ -22,7 +22,7 @@ ros::NodeHandle nh;
 
 // トピックのコールバック関数
 void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
-  separate_sign = spr_msg.do;
+  separate_sign = spr_msg.isOn;
   spr_duty = spr_msg.duty;
 }
 

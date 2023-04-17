@@ -1,0 +1,6 @@
+[31m[1mCMake Error[0m at /home/m/ABU2023_ws/src/adbot_separate_rings/CMakeLists.txt:150 (target_link_libraries):
+  Cannot specify link libraries for target "$separate_ring" which is not
+  built by this project.
+
+
+make: *** [Makefile:530: cmake_check_build_system] エラー 1

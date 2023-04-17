@@ -1,0 +1,16 @@
+[31m[1mCMake Error[0m at /home/m/ABU2023_ws/src/adbot_separate_rings/CMakeLists.txt:147 (add_dependencies):
+  Cannot add target-level dependencies to non-existent target
+  "adbot_separate_rings".
+
+  The add_dependencies works for top-level logical targets created by the
+  add_executable, add_library, or add_custom_target commands.  If you want to
+  add file-level dependencies see the DEPENDS option of the add_custom_target
+  and add_custom_command commands.
+
+
+[31m[1mCMake Error[0m at /home/m/ABU2023_ws/src/adbot_separate_rings/CMakeLists.txt:150 (target_link_libraries):
+  Cannot specify link libraries for target "adbot_separate_rings" which is
+  not built by this project.
+
+
+make: *** [Makefile:530: cmake_check_build_system] エラー 1

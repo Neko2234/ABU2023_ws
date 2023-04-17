@@ -1,0 +1,23 @@
+[  0%] Built target std_msgs_generate_messages_py
+[  0%] Built target std_msgs_generate_messages_nodejs
+[  0%] Built target rosgraph_msgs_generate_messages_lisp
+[  0%] Built target rosgraph_msgs_generate_messages_nodejs
+[  0%] Built target std_msgs_generate_messages_cpp
+[  0%] Built target std_msgs_generate_messages_lisp
+[  0%] Built target roscpp_generate_messages_py
+[  0%] Built target roscpp_generate_messages_cpp
+[  0%] Built target roscpp_generate_messages_eus
+[  0%] Built target rosgraph_msgs_generate_messages_py
+[  0%] Built target roscpp_generate_messages_lisp
+[  0%] Built target std_msgs_generate_messages_eus
+[  0%] Built target roscpp_generate_messages_nodejs
+[  0%] Built target rosgraph_msgs_generate_messages_cpp
+[  0%] Built target rosgraph_msgs_generate_messages_eus
+[ 50%] [32mBuilding CXX object CMakeFiles/adbot_separate_rings.dir/src/separate_rings.cpp.o[0m
+[01m[K/home/m/ABU2023_ws/src/adbot_separate_rings/src/separate_rings.cpp:2:9:[m[K [01;31m[Kfatal error: [m[Kadbot_msgs/SprMsg.h: そのようなファイルやディレクトリはありません
+    2 | #include[01;31m[K<adbot_msgs/SprMsg.h>[m[K
+      |         [01;31m[K^~~~~~~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/adbot_separate_rings.dir/build.make:63: CMakeFiles/adbot_separate_rings.dir/src/separate_rings.cpp.o] エラー 1
+make[1]: *** [CMakeFiles/Makefile2:439: CMakeFiles/adbot_separate_rings.dir/all] エラー 2
+make: *** [Makefile:141: all] エラー 2
