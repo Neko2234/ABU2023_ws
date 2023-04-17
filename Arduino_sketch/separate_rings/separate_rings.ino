@@ -17,6 +17,9 @@ bool separate_sign = false;
 bool separate_pre_sign = false;
 bool is_separating = false;
 bool is_pausing = false;
+unsigned long pause_start_time = 0;
+unsigned long pause_end_time = 0;
+unsigned int pause_time = 0;
 
 ros::NodeHandle nh;
 
@@ -27,7 +30,7 @@ void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
 }
 
 // トピックを受け取るためのサブスクライバーを作成
-ros::Subscriber<fabot_msgs::ArmMsg> sub("separate", &separateRingCallback);
+ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
 
 void setup() {
   // すべてのモータ，エンコーダの初期化
@@ -56,16 +59,16 @@ void loop() {
       is_pausing = false;
     }
     pause_time = pause_end_time - pause_start_time;
-    
+
     dt = time_now - time_prev - pause_time;
 
-    if (dt < LAP_TIME) {
+    if (dt < ONE_WAY_TIME) {
       DC_motor::put(SPR_MOTOR, spr_duty);
-    } else if (dt < LAP_TIME + STOP_TIME) {
+    } else if (dt < ONE_WAY_TIME + STOP_TIME) {
       DC_motor::put(SPR_MOTOR, 0);
-    } else if (dt < LAP_TIME * 2 + STOP_TIME) {
+    } else if (dt < ONE_WAY_TIME * 2 + STOP_TIME) {
       DC_motor::put(SPR_MOTOR, -spr_duty);
-    } else if (dt < LAP_TIME * 2 + STOP_TIME * 2) {
+    } else if (dt < ONE_WAY_TIME * 2 + STOP_TIME * 2) {
       DC_motor::put(SPR_MOTOR, 0);
     } else {
       time_prev = time_now;
