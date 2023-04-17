@@ -1,6 +1,6 @@
 #include "cubic_arduino.h"
 #include <ros.h>
-#include <ArmMsg.h>
+#include <fabot_msgs/ArmMsg.h>
 
 #define HAND_MOTOR 8  // 手のモーター番号
 #define ARM_MOTOR 1   // 腕のモーター番号
