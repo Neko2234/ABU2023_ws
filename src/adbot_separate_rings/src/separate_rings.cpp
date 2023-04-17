@@ -2,7 +2,8 @@
 #include<adbot_msgs/SprMsg.h>
 #include<sensor_msgs/Joy.h>
 
-#define SEPARATE_BUTTON 5 //ボタン
+#define SEPARATE_BUTTON 3 //ボタン
+#define SPR_DUTY 100
 
 adbot_msgs::SprMsg spr_msg;
 
@@ -19,6 +20,8 @@ int main(int argc, char **argv)
 
     //ROSノードハンドルを作成
     ros::NodeHandle nh;
+
+    spr_msg.duty = SPR_DUTY;
 
     //ジョイコンのトピックを購読
     ros::Subscriber sub = nh.subscribe<sensor_msgs::Joy>("joy", 1, joyCallback);
