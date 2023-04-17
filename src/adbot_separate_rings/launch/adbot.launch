@@ -1,13 +1,13 @@
 <launch>
-  <group ns="fabot">
+  <group ns="adbot">
   
-    <node pkg="load_ring_package" name="load_ring_node" type="load_ring"/>
+    <node pkg="adbot_separate_rings" name="separate_rings_node" type="separate_rings"/>
     
     <node pkg="joy" name="joy_node" type="joy_node">
       <param name="dev" type="string" value="/dev/input/js1"/>
     </node>
     
-    <node pkg="rosserial_python" type="serial_node.py" name="serial_node0">
+    <node pkg="rosserial_python" type="serial_node.py" name="serial_node1">
       <param name="port" value="/dev/ttyACM0"/>
       <param name="baud" value="9600"/>
     </node>
