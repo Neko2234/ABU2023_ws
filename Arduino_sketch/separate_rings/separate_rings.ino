@@ -12,14 +12,15 @@
 int spr_duty = 800;
 unsigned long time_prev = 0;
 unsigned long time_now = 0;
-unsigned int dt = 0;
+unsigned long dt = 0;
+unsigned long corrected_dt = 0;
 bool separate_sign = false;
 bool separate_pre_sign = false;
-bool is_separating = false;
+bool is_separating = true;
 bool is_pausing = false;
 unsigned long pause_start_time = 0;
 unsigned long pause_end_time = 0;
-unsigned int pause_time = 0;
+unsigned long pause_time = 0;
 
 ros::NodeHandle nh;
 
@@ -34,8 +35,9 @@ void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
 ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
 
 void setup() {
-  Serial
-    .begin(9600);
+  Serial.begin(9600);
+  pinMode(22, OUTPUT);
+  pinMode(23, OUTPUT);
   // すべてのモータ，エンコーダの初期化
   Cubic::begin();
   nh.getHardware()->setBaud(9600);
@@ -48,11 +50,17 @@ void setup() {
 void loop() {
   nh.spinOnce();
   delay(30);
-  Serial.write(time_now);
-  Serial.write(",");
-  Serial.write(time_prev);
-  Serial.write(",");
-  Serial.writeln(dt);
+  Serial.print(time_now);
+  Serial.print(",");
+  Serial.print(time_prev);
+  Serial.print(",");
+  Serial.print(pause_time);
+  Serial.print(",");
+  Serial.print(dt);
+  Serial.print(",");
+  Serial.print(corrected_dt);
+  Serial.print(",");
+  Serial.println(is_separating);
 
 
   // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
@@ -61,8 +69,8 @@ void loop() {
   }
 
   if (is_separating) {
-    digitalWrite(23, HIGH);
-    time_now = micros() / 1000;
+    digitalWrite(23, LOW);
+    time_now = millis();
 
     if (!is_pausing) {
       pause_end_time = time_now;
@@ -70,24 +78,25 @@ void loop() {
     }
     pause_time = pause_end_time - pause_start_time;
 
-    dt = time_now - time_prev - pause_time;
+    dt = time_now - time_prev;
+    corrected_dt = dt - pause_time; // pausetime is bad
 
-    if (dt < ONE_WAY_TIME) {
+    if (corrected_dt < ONE_WAY_TIME) {
+      pause_time = 0;
       digitalWrite(22, LOW);
       DC_motor::put(SPR_MOTOR, spr_duty);
-    } else if (dt < ONE_WAY_TIME + STOP_TIME) {
+    } else if (corrected_dt < ONE_WAY_TIME + STOP_TIME) {
       DC_motor::put(SPR_MOTOR, 0);
-    } else if (dt < ONE_WAY_TIME * 2 + STOP_TIME) {
+    } else if (corrected_dt < ONE_WAY_TIME * 2 + STOP_TIME) {
       digitalWrite(22, LOW);
       DC_motor::put(SPR_MOTOR, -spr_duty);
-    } else if (dt < ONE_WAY_TIME * 2 + STOP_TIME * 2) {
+    } else if (corrected_dt < ONE_WAY_TIME * 2 + STOP_TIME * 2) {
       DC_motor::put(SPR_MOTOR, 0);
     } else {
       time_prev = time_now;
-      pause_time = 0;
     }
   } else {
-    digitalWrite(23, LOW);
+    digitalWrite(23, HIGH);
     is_pausing = true;
     pause_start_time = time_now;
   }
