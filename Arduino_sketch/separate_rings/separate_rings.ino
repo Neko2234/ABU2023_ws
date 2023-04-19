@@ -1,14 +1,15 @@
 #include "cubic_arduino.h"
 #include <ros.h>
+#include <std_msgs/Int16>
 #include <adbot_msgs/SprMsg.h>
 
-#define SPR_MOTOR 8    // 分離のモーター番号
-#define SPR_ENC_NUM 0  // 分離のエンコーダ番号
+#define SPR_MOTOR 8        // 分離のモーター番号
+#define SPR_ENC_NUM 0      // 分離のエンコーダ番号
 #define ONE_WAY_COUNT 500  //片道のエンコーダカウント
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
-int spr_duty = 50;   //指定するDutyの絶対値ROSメッセージから指定できる
+int spr_duty = 50;    //指定するDutyの絶対値ROSメッセージから指定できる
 int duty = spr_duty;  //実際にCubicに指定する値
 
 bool separate_sign = false;
@@ -28,11 +29,15 @@ ros::NodeHandle nh;
 void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
   separate_pre_sign = separate_sign;
   separate_sign = spr_msg.isOn;
-  spr_duty = spr_msg.duty;
+}
+
+void cmdCallback(const std_msgs::Int16 &cmd_msg) {
+  spr_duty = cmd_msg.data;
 }
 
 トピックを受け取るためのサブスクライバーを作成
 ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
+ros::Subscriber<std_msgs::Int16> cmd_sub("separate", &cmdCallback);
 
 void setup() {
   pinMode(24, OUTPUT);
