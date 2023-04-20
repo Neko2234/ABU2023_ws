@@ -2,21 +2,19 @@
 // #include <ros.h>
 // #include <adbot_msgs/SprMsg.h>
 
-#define SPR_MOTOR 8    // 分離のモーター番号
+#define SPR_MOTOR 11   // 分離のモーター番号
 #define SPR_ENC_NUM 0  // 分離のエンコーダ番号
-#define STOP 0
-#define CW 1
-#define CCW 2
 #define ONE_WAY_COUNT 500  //片道のエンコーダカウント
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
-int spr_duty = 50;   //指定するDutyの絶対値ROSメッセージから指定できる
+int spr_duty = 70;    //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
 int duty = spr_duty;  //実際にCubicに指定する値
 
 bool separate_sign = false;
 bool separate_pre_sign = false;
-bool is_separating = true;
+bool is_go_separating = false;
+bool is_come_separating = false;
 bool is_paused = true;
 
 bool is_checking = false;
@@ -53,11 +51,20 @@ void setup() {
 
 void loop() {
   if (Serial.available() > 0) {
-    spr_duty = Serial.readStringUntil(':').toInt();
-    is_separating = Serial.readStringUntil('\n').toInt();
+    char mode = Serial.read();
+    if (mode == 'd') {
+      spr_duty = Serial.readStringUntil(':').toInt();
+      is_go_separating = Serial.readStringUntil('\n').toInt();
+    }
+
+    else if (mode == 'r') {
+      spr_duty = 0;
+      is_go_separating = false;
+      is_come_separating = false;
+    }
   }
   int16_t enc_diff = Inc_enc::get_diff(SPR_ENC_NUM);
-  int32_t enc_count = Inc_enc::get(SPR_ENC_NUM);
+  int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
   Serial.print(enc_diff);
   Serial.print(",");
   Serial.print(enc_count);
@@ -69,42 +76,44 @@ void loop() {
 
   // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
   if (separate_sign && !separate_pre_sign) {
-    is_separating = !is_separating;
+    is_go_separating = true;
   }
-
-
-
-  if (is_separating) {
-    // // ストッパーに引っかかってたら分離中断
-    // if ((abs(enc_diff) < ENC_DIFF_MIN) && (abs(duty) > 5)) {
-    //   time_now = micros() / 1000;
-    //   if (!is_checking) {
-    //     is_checking = true;
-    //     time_start = time_now;
-    //     check_time = 0;
-    //   } else {
-    //     check_time = time_now - time_start;
-    //   }
-    //   if (check_time > 1000)  //1000ms以上エンコーダの差分が小さいかつ指定Dutyが0でなければ分離中断
-    //     is_separating = false;
-    // } else {
-    //   is_checking = false;
-    // }
-
-    digitalWrite(23, HIGH);
-    if (enc_count > ONE_WAY_COUNT) {
+  // // ストッパーに引っかかってたら分離中断
+  // if ((abs(enc_diff) < ENC_DIFF_MIN) && (abs(duty) > 5)) {
+  //   time_now = micros() / 1000;
+  //   if (!is_checking) {
+  //     is_checking = true;
+  //     time_start = time_now;
+  //     check_time = 0;
+  //   } else {
+  //     check_time = time_now - time_start;
+  //   }
+  //   if (check_time > 1000)  //1000ms以上エンコーダの差分が小さいかつ指定Dutyが0でなければ分離中断
+  //     is_separating = false;
+  // } else {
+  //   is_checking = false;
+  // }
+  digitalWrite(23, HIGH);
+  digitalWrite(24, HIGH);
+  if (is_go_separating && !is_come_separating) {
+    if (enc_count < ONE_WAY_COUNT) {
       digitalWrite(24, LOW);
       duty = spr_duty;
-    } else if (enc_count < 0) {
-      digitalWrite(24, HIGH);
+    } else {
+      is_go_separating = false;
+      is_come_separating = true;
+    }
+  } else if (is_come_separating && !is_go_separating) {
+    if (enc_count > 50) {
+      digitalWrite(23, LOW);
       duty = -spr_duty;
-    } else if (is_paused) {
-      duty = spr_duty;
-      is_paused = false;
+    } else {
+      is_come_separating = false;
+      duty = 0;
     }
   } else {
-    digitalWrite(23, LOW);
-    is_paused = true;
+    is_go_separating = false;
+    is_come_separating = false;
     duty = 0;
   }
   DC_motor::put(SPR_MOTOR, duty);
