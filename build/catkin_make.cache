@@ -1,0 +1,2 @@
+adbot_msgs:fabot_msgs:load_ring_package:separate_ring
+-DCATKIN_DEVEL_PREFIX=/home/m/ABU2023_ws/devel -DCMAKE_INSTALL_PREFIX=/home/m/ABU2023_ws/install -G Unix Makefiles

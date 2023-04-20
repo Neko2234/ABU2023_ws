@@ -33,7 +33,7 @@ ros::Subscriber<fabot_msgs::ArmMsg> sub("hand_state", &loadRingCallback);
 void setup() {
   // すべてのモータ，エンコーダの初期化
   Cubic::begin();
-  nh.getHardware()->setBaud(9600);
+  nh.getHardware()->setBaud(2000000);
 
   // ROSの通信を開始
   nh.initNode();

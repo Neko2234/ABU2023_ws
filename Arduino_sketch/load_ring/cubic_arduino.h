@@ -67,8 +67,12 @@ class DC_motor {
         static void begin(void);
 
         // 指定したモータのDutyを格納する関数
-        // 第1引数：モーター番号0~7，第2引数：duty，第3引数：最大duty
+        // 第1引数：モータ番号0~11，第2引数：duty，第3引数：最大duty
         static void put(uint8_t num, int16_t duty, uint16_t duty_max = 1000);
+
+        // 指定したモータのDutyを取得する関数
+        // 第1引数：モータ番号0~11
+        static int16_t get(uint8_t num);
 
         // すべてのモータのDutyをSPI通信で送信する関数
         static void send(void);
@@ -198,7 +202,7 @@ class Cubic{
         static void begin(float current_limit = 2.0);
 
         // データの送受信をまとめて行う関数
-        static void update(unsigned int us = 2000);
+        static void update(unsigned int us = 4000);
     
     private:
         // 1つ前のループの時刻
