@@ -3,86 +3,87 @@
 #include <std_msgs/Int16>
 #include <adbot_msgs/SprMsg.h>
 
-#define SPR_MOTOR 8        // 分離のモーター番号
+///初期状態は下の刃でリングを受け止めている状態を想定///
+#define SPR_MOTOR 11       // 分離のモーター番号
 #define SPR_ENC_NUM 0      // 分離のエンコーダ番号
 #define ONE_WAY_COUNT 500  //片道のエンコーダカウント
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
-int spr_duty = 50;    //指定するDutyの絶対値ROSメッセージから指定できる
+int spr_duty = 250;   //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
 int duty = spr_duty;  //実際にCubicに指定する値
 
 bool separate_sign = false;
 bool separate_pre_sign = false;
-bool is_separating = true;
+bool is_go_separating = false;    //初期位置から折り返しまでの間は真
+bool is_come_separating = false;  //折り返しから初期位置までの間は真
 bool is_paused = true;
-
-bool is_checking = false;
-unsigned long check_time = 0;
-unsigned long time_start = 0;
-unsigned long time_now = 0;
-
 
 ros::NodeHandle nh;
 
-トピックのコールバック関数
+// トピックのコールバック関数
 void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
   separate_pre_sign = separate_sign;
   separate_sign = spr_msg.isOn;
 }
-
-void cmdCallback(const std_msgs::Int16 &cmd_msg) {
-  spr_duty = cmd_msg.data;
+void termCallback(const std_msg::Int16 &msg) {
+  spr_duty = msg.data;
 }
 
-トピックを受け取るためのサブスクライバーを作成
+// トピックを受け取るためのサブスクライバーを作成
 ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
-ros::Subscriber<std_msgs::Int16> cmd_sub("separate", &cmdCallback);
+ros::Subscriber<std_msgs::Int16> term_sub("separate", &termCallback);
 
 void setup() {
   pinMode(24, OUTPUT);
   pinMode(23, OUTPUT);
-
   // すべてのモータ，エンコーダの初期化
   Cubic::begin(3.0);
   Inc_enc::reset();
   nh.getHardware()->setBaud(9600);
 
-  ROSの通信を開始
+  // ROSの通信を開始
   nh.initNode();
   nh.subscribe(sub);
+  nh.subscribe(term_sub);
 }
 
 void loop() {
-  int16_t enc_diff = Inc_enc::get_diff(SPR_ENC_NUM);
-  int32_t enc_count = Inc_enc::get(SPR_ENC_NUM);
-
   nh.spinOnce();
+
+  int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
 
   // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
   if (separate_sign && !separate_pre_sign) {
-    is_separating = !is_separating;
+    is_go_separating = true;
   }
 
-  if (is_separating) {
+  digitalWrite(23, HIGH);
+  digitalWrite(24, HIGH);
 
-    digitalWrite(23, HIGH);
-    if (enc_count > ONE_WAY_COUNT) {
+  //両方とも真のときは停止してふたつとも偽とする
+  if (is_go_separating && !is_come_separating) {
+    if (enc_count < ONE_WAY_COUNT) {
       digitalWrite(24, LOW);
       duty = spr_duty;
-    } else if (enc_count < 0) {
-      digitalWrite(24, HIGH);
+    } else {
+      is_go_separating = false;
+      is_come_separating = true;
+    }
+  } else if (is_come_separating && !is_go_separating) {
+    if (enc_count > 50) {
+      digitalWrite(23, LOW);
       duty = -spr_duty;
-    } else if (is_paused) {
-      duty = spr_duty;
-      is_paused = false;
+    } else {
+      is_come_separating = false;
+      duty = 0;
     }
   } else {
-    digitalWrite(23, LOW);
-    is_paused = true;
+    is_go_separating = false;
+    is_come_separating = false;
     duty = 0;
   }
-  DC_motor::put(SPR_MOTOR, duty);
+  DC_motor::put(SPR_MOTOR, duty);  //dutyをセット
 
   // データの送受信を行う
   Cubic::update();
