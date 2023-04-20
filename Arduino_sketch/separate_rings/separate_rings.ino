@@ -1,6 +1,6 @@
 #include "cubic_arduino.h"
 #include <ros.h>
-#include <std_msgs/Int16>
+#include <std_msgs/Int16.h>
 #include <adbot_msgs/SprMsg.h>
 
 ///初期状態は下の刃でリングを受け止めている状態を想定///
@@ -26,7 +26,7 @@ void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
   separate_pre_sign = separate_sign;
   separate_sign = spr_msg.isOn;
 }
-void termCallback(const std_msg::Int16 &msg) {
+void termCallback(const std_msgs::Int16 &msg) {
   spr_duty = msg.data;
 }
 
