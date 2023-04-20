@@ -4,7 +4,7 @@
     <node pkg="separate_ring" name="separate_ring_node" type="separate_ring_node"/>
     
     <node pkg="joy" name="joy_node" type="joy_node">
-      <param name="dev" type="string" value="/dev/input/js1"/>
+      <param name="dev" type="string" value="/dev/input/js2"/>
     </node>
     
     <node pkg="rosserial_python" type="serial_node.py" name="serial_node1">

@@ -373,5 +373,5 @@ void Cubic::update(const unsigned int us) {
 
     Abs_enc::receive();
     Inc_enc::receive();
-    Adc::receive();
+    // Adc::receive();
 }

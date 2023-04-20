@@ -6,8 +6,8 @@
 #define OPEN_HAND_BUTTON 4 //L1ボタン
 #define UP_ARM_BUTTON 1 //右上ボタン
 #define DOWN_ARM_BUTTON 2 //右下ボタン
-#define HAND_DUTY 250 //Arduinoに指定するDuty
-#define ARM_DUTY 500
+#define HAND_DUTY 470 //Arduinoに指定するDuty
+#define ARM_DUTY 470
 
 fabot_msgs::ArmMsg arm_state_msg;
 

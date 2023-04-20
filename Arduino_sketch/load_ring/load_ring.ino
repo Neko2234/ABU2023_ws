@@ -2,8 +2,8 @@
 #include <ros.h>
 #include <fabot_msgs/ArmMsg.h>
 
-#define HAND_MOTOR 8  // 手のモーター番号
-#define ARM_MOTOR 1   // 腕のモーター番号
+#define HAND_MOTOR 11  // 手のモーター番号
+#define ARM_MOTOR 10   // 腕のモーター番号
 #define STOP 0
 #define DO_OPEN 1
 #define DO_CLOSE 2
@@ -42,27 +42,26 @@ void setup() {
 
 void loop() {
   nh.spinOnce();
-  delay(30);
 
   if (hand_state == STOP) {
-    // digitalWrite(23, HIGH);
+    digitalWrite(23, HIGH);
     DC_motor::put(HAND_MOTOR, 0);
   } else if (hand_state == DO_OPEN) {
-    // digitalWrite(23, LOW);
+    digitalWrite(23, LOW);
     DC_motor::put(HAND_MOTOR, hand_duty);
   } else if (hand_state == DO_CLOSE) {
-    // digitalWrite(23, LOW);
+    digitalWrite(23, LOW);
     DC_motor::put(HAND_MOTOR, -hand_duty);
   }
   
   if (arm_state == STOP) {
-    // digitalWrite(24, HIGH);
+    digitalWrite(24, HIGH);
     DC_motor::put(ARM_MOTOR, 0);
   } else if (arm_state == DO_UP) {
-    // digitalWrite(24, LOW);
+    digitalWrite(24, LOW);
     DC_motor::put(ARM_MOTOR, arm_duty);
   } else if (arm_state == DO_DOWN) {
-    // digitalWrite(24, LOW);
+    digitalWrite(24, LOW);
     DC_motor::put(ARM_MOTOR, -arm_duty);
   }
 

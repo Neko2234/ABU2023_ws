@@ -13,7 +13,7 @@ int duty = spr_duty;  //実際にCubicに指定する値
 
 bool separate_sign = false;
 bool separate_pre_sign = false;
-bool is_separating = true;
+bool is_separating = false;
 bool is_paused = true;
 
 bool is_checking = false;
@@ -24,14 +24,14 @@ unsigned long time_now = 0;
 
 ros::NodeHandle nh;
 
-トピックのコールバック関数
+// トピックのコールバック関数
 void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
   separate_pre_sign = separate_sign;
   separate_sign = spr_msg.isOn;
   spr_duty = spr_msg.duty;
 }
 
-トピックを受け取るためのサブスクライバーを作成
+// トピックを受け取るためのサブスクライバーを作成
 ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
 
 void setup() {
@@ -43,7 +43,7 @@ void setup() {
   Inc_enc::reset();
   nh.getHardware()->setBaud(9600);
 
-  ROSの通信を開始
+  // ROSの通信を開始
   nh.initNode();
   nh.subscribe(sub);
 }
