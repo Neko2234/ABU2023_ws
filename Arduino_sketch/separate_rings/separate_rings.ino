@@ -1,6 +1,6 @@
 #include "cubic_arduino.h"
 #include <ros.h>
-// #include <std_msgs/Int16.h>
+#include <std_msgs/Int16.h>
 #include <adbot_msgs/SprMsg.h>
 
 ///初期状態は下の刃でリングを受け止めている状態を想定///
@@ -26,13 +26,13 @@ void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
   separate_pre_sign = separate_sign;
   separate_sign = spr_msg.isOn;
 }
-// void termCallback(const std_msgs::Int16 &msg) {
-//   spr_duty = msg.data;
-// }
+void termCallback(const std_msgs::Int16 &msg) {
+  spr_duty = msg.data;
+}
 
 // トピックを受け取るためのサブスクライバーを作成
 ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
-// ros::Subscriber<std_msgs::Int16> term_sub("separate", &termCallback);
+ros::Subscriber<std_msgs::Int16> term_sub("term_separate", &termCallback);
 
 void setup() {
   pinMode(24, OUTPUT);
@@ -45,7 +45,7 @@ void setup() {
   // ROSの通信を開始
   nh.initNode();
   nh.subscribe(sub);
-  // nh.subscribe(term_sub);
+  nh.subscribe(term_sub);
 }
 
 void loop() {
