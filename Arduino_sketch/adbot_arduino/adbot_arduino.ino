@@ -15,16 +15,24 @@
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
+// DCモータ番号
+#define SHOOT_MOTOR_LU 0  // 左上
+#define SHOOT_MOTOR_LD 1  // 左下
+#define SHOOT_MOTOR_RU 2  // 右上
+#define SHOOT_MOTOR_RD 3  // 右下
+
 using namespace Cubic_controller;
 
-int spr_indicated_duty = 250;       //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
+//分離
+int spr_indicated_duty = 250;       //指定するDutyの絶対値。ROSメッセージから指定できる。メインなら70、サブなら250
 int spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
-double target = 2.25; // 正面
-
 bool spr_sign = false;
 bool spr_pre_sign = false;
 bool spr_is_go_separating = false;    //初期位置から折り返しまでの間は真
 bool spr_is_come_separating = false;  //折り返しから初期位置までの間は真
+//射出
+double target = 2.25;    // 正面
+int32_t shoot_duty = 0;  // 射出のDuty
 
 void publish(void);
 void spr_set_duty(void);
@@ -33,7 +41,6 @@ ros::NodeHandle nh;
 std_msgs::Float64 angle_diff;
 std_msgs::Float64 angle;
 std_msgs::Int16 duty;
-// bool_msg.data = false;
 ros::Publisher pub_angle_diff("angle_diff", &angle_diff);
 ros::Publisher pub_angle("angle", &angle);
 ros::Publisher pub_duty("duty", &duty);
@@ -49,6 +56,7 @@ void termSprCb(const std_msgs::Int16 &msg) {
 }
 //照準
 void cmdShootingDutyCb(const std_msgs::Int32 &duty_msg) {
+  shoot_duty = duty_msg.data;
 }
 void cmdAngleCb(const std_msgs::Float64 &angle_msg) {
   target = degToRad(angle_msg.data) + 2.25;
@@ -78,7 +86,7 @@ void setup() {
   //分離デバッグ用
   pinMode(24, OUTPUT);
   pinMode(23, OUTPUT);
-  
+
   // すべてのモータ，エンコーダの初期化
   Cubic::begin(3.0);
   Inc_enc::reset();
@@ -105,7 +113,12 @@ void loop() {
   // 分離のDuty決定
   spr_set_duty();
 
-  DC_motor::put(SPR_MOTOR, spr_duty);  //dutyをセット
+  //dutyをセット
+  DC_motor::put(SHOOT_MOTOR_LU, shoot_duty);
+  DC_motor::put(SHOOT_MOTOR_LD, shoot_duty);
+  DC_motor::put(SHOOT_MOTOR_RU, shoot_duty);
+  DC_motor::put(SHOOT_MOTOR_RD, shoot_duty);
+  DC_motor::put(SPR_MOTOR, spr_duty);
   set_position();
 
   // データの送受信を行う
@@ -116,32 +129,28 @@ void loop() {
   nh.spinOnce();
 }
 
-void set_position(){
+void set_position() {
   static Velocity_PID velocityPID(3, 0, encoderType::inc, 2048 * 4, 0.5, 0.5, 0.5, 0.1, 0.4, false, true);
   static Position_PID positionPID(3, 0, encoderType::abs, AMT22_CPR, 0.2, 0.25, 0.0, 0.0, target, true, true);
   static bool stopFlag = false;
-  if (stopFlag)
-  {
+  if (stopFlag) {
     // Serial.println("stopping...");
-    for (int i = 0; i < 8; i++)
-    {
+    for (int i = 0; i < 8; i++) {
       DC_motor::put(i, 0);
     }
-  }
-  else
-  {
+  } else {
     // velocityPID.compute();
     positionPID.setTarget(target);
     positionPID.compute();
     duty.data = DC_motor::get(3);
-  }  
+  }
 
   angle_diff.data = abs(positionPID.getTarget() - positionPID.getCurrent());
   angle.data = positionPID.getCurrent() - 2.25;
   angle.data = radToDeg(angle.data);
 }
 
-void publish(){
+void publish() {
   pub_angle_diff.publish(&angle_diff);
   pub_angle.publish(&angle);
   pub_duty.publish(&duty);
