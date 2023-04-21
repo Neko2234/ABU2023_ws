@@ -1,98 +1,120 @@
 #include "cubic_arduino.h"
 #include <ros.h>
+#include <std_msgs/Int16.h>
+
 #include <adbot_msgs/SprMsg.h>
 
-/*モーターの利用*/
-// put関数で各モータのduty比指定，duty比の符号反転で逆回転
-// Dutyの最大値はデフォルトで1000
-
-/*インクリメントエンコーダの利用*/
-// get関数で各エンコーダの累積値を取得．get_diff関数で各エンコーダの差分値を取得．
-
-/*アブソリュートエンコーダの利用*/
-// get関数で各エンコーダの絶対位置[0, 16383]を取得．
-
-/*ソレノイドの利用*/
-// put関数で各ソレノイドの状態指定
-// get関数で各ソレノイドの状態を取得
-
-// 各種print関数はSerial.begin()を実行したあとでないと使えない．(ROSと一緒には使えない)
-
-// 詳しくはヘッダファイル参照
-#define SPR_MOTOR 8    // 分離のモーター番号
-#define SPR_ENC_NUM 0  // 分離のエンコーダ番号
+///初期状態は下の刃でリングを受け止めている状態を想定///
+#define SPR_MOTOR 11       // 分離のモーター番号
+#define SPR_ENC_NUM 0      // 分離のエンコーダ番号
 #define ONE_WAY_COUNT 500  //片道のエンコーダカウント
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
-int spr_duty = 50;   //指定するDutyの絶対値ROSメッセージから指定できる
-int duty = spr_duty;  //実際にCubicに指定する値
-bool separate_sign = false;
-bool separate_pre_sign = false;
-bool is_separating = true;
-bool is_paused = true;
+int spr_indicated_duty = 250;   //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
+int spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
+
+bool spr_sign = false;
+bool spr_pre_sign = false;
+bool spr_is_go_separating = false;    //初期位置から折り返しまでの間は真
+bool spr_is_come_separating = false;  //折り返しから初期位置までの間は真
+
+void spr_set_duty(void);
 
 ros::NodeHandle nh;
 
-トピックのコールバック関数
-void separateRingCallback(const adbot_msgs::SprMsg &spr_msg) {
-  separate_pre_sign = separate_sign;
-  separate_sign = spr_msg.isOn;
-  spr_duty = spr_msg.duty;
+// トピックのコールバック関数
+// 分離
+void cmdToggleShootCb(const std_msgs::Bool &spr_msg) {
+  spr_pre_sign = spr_sign;
+  spr_sign = spr_msg.data;
 }
+void termSprCb(const std_msgs::Int16 &msg) {
+  spr_indicated_duty = msg.data;
+}
+//照準
+void cmdShootingDutyCb(const std_msgs::Int32 &duty_msg) {
+}
+void cmdAngleCb(const std_msgs::Float64 &angle_msg) {
+}
+void cmdToggleReceiveCb(const std_msgs::Bool &recieve_msg) {
+}
+void cmdToggleBeltCb(const std_msgs::Bool &belt_msg) {
+}
+void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
+}
+// void cmdEmergencyStopCb(const std_msgs::Bool &stop_msg){
 
-トピックを受け取るためのサブスクライバーを作成
-ros::Subscriber<adbot_msgs::SprMsg> sub("separate", &separateRingCallback);
+// }
+
+// トピックを受け取るためのサブスクライバーを作成
+// 分離
+ros::Subscriber<std_msgs::Bool> cmd_toggle_shoot_sub("cmd_toggle_shoot", &cmdToggleShootCb);
+ros::Subscriber<std_msgs::Int16> term_spr_sub("term_spr", &termSprCb);
+//照準
+ros::Subscriber<std_msgs::Int32> cmd_shooting_duty_sub("cmd_shooting_duty", &cmdShootingDutyCb);
+ros::Subscriber<std_msgs::Float64> cmd_angle_sub("cmd_angle", &cmdAngleCb);
+ros::Subscriber<std_msgs::Bool> cmd_toggle_receive_sub("cmd_toggle_receive", &cmdToggleReceiveCb);
+ros::Subscriber<std_msgs::Bool> cmd_toggle_belt_sub("cmd_toggle_belt", &cmdToggleBeltCb);
+ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cmdEmergencyStopCb);
 
 void setup() {
-  //デバッグ用
   pinMode(24, OUTPUT);
   pinMode(23, OUTPUT);
-  
   // すべてのモータ，エンコーダの初期化
-  // 第1引数に最大許容電流を与える．
   Cubic::begin(3.0);
-  // Serial.begin(115200);
-
   Inc_enc::reset();
   nh.getHardware()->setBaud(9600);
 
-  // time_prev = micros();
-  ROSの通信を開始
+  // ROSの通信を開始
   nh.initNode();
   nh.subscribe(sub);
+  nh.subscribe(term_sub);
+
+  // 分離デバッグ用
+  digitalWrite(23, HIGH);
+  digitalWrite(24, HIGH);
 }
 
 void loop() {
-  int16_t enc_diff = Inc_enc::get_diff(SPR_ENC_NUM);
-  int32_t enc_count = Inc_enc::get(SPR_ENC_NUM);
-
   nh.spinOnce();
 
-  // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
-  if (separate_sign && !separate_pre_sign) {
-    is_separating = !is_separating;
-  }
+  spr_set_duty()
 
-  if (is_separating) {
-    digitalWrite(23, HIGH);
-    if (enc_count > ONE_WAY_COUNT) {
-      digitalWrite(24, LOW);
-      duty = spr_duty;
-    } else if (enc_count < 0) {
-      digitalWrite(24, HIGH);
-      duty = -spr_duty;
-    } else if (is_paused) {
-      duty = spr_duty;
-      is_paused = false;
-    }
-  } else {
-    digitalWrite(23, LOW);
-    is_paused = true;
-    duty = 0;
-  }
-  DC_motor::put(SPR_MOTOR, duty);
+  DC_motor::put(SPR_MOTOR, spr_duty);  //dutyをセット
 
   // データの送受信を行う
   Cubic::update();
+}
+
+void spr_set_duty(){
+  int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
+
+  // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
+  if (spr_sign && !spr_pre_sign) {
+    spr_is_go_separating = true;
+  }
+
+  //両方とも真のときは停止してふたつとも偽とする
+  if (spr_is_go_separating && !spr_is_come_separating) {
+    if (enc_count < ONE_WAY_COUNT) {
+      digitalWrite(24, LOW);
+      spr_duty = spr_indicated_duty;
+    } else {
+      spr_is_go_separating = false;
+      spr_is_come_separating = true;
+    }
+  } else if (spr_is_come_separating && !spr_is_go_separating) {
+    if (enc_count > 50) {
+      digitalWrite(23, LOW);
+      spr_duty = -spr_indicated_duty;
+    } else {
+      spr_is_come_separating = false;
+      spr_duty = 0;
+    }
+  } else {
+    spr_is_go_separating = false;
+    spr_is_come_separating = false;
+    spr_duty = 0;
+  }
 }
