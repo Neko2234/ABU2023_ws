@@ -2,25 +2,25 @@
 // #include <ros.h>
 // #include <adbot_msgs/SprMsg.h>
 
-#define SPR_MOTOR 11   // 分離のモーター番号
-#define SPR_ENC_NUM 0  // 分離のエンコーダ番号
-#define ONE_WAY_COUNT 500  //片道のエンコーダカウント
+#define SPR_MOTOR 8        // 分離のモーター番号
+#define SPR_ENC_NUM 0      // 分離のエンコーダ番号
+#define ONE_WAY_COUNT 400  //片道のエンコーダカウント
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
+#define STOP_TIME 500  // ミリ秒
 
-int spr_duty = 70;    //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
+int spr_duty = 70;    //指定するDutyの絶対値ROSメッセージから指定できる
 int duty = spr_duty;  //実際にCubicに指定する値
 
 bool separate_sign = false;
 bool separate_pre_sign = false;
 bool is_go_separating = false;
 bool is_come_separating = false;
-bool is_paused = true;
+bool is_stopping = false;
 
-bool is_checking = false;
-unsigned long check_time = 0;
-unsigned long time_start = 0;
-unsigned long time_now = 0;
+// bool is_checking = false;
+unsigned long stop_start_time = 0;
+
 
 
 // ros::NodeHandle nh;
@@ -53,8 +53,9 @@ void loop() {
   if (Serial.available() > 0) {
     char mode = Serial.read();
     if (mode == 'd') {
-      spr_duty = Serial.readStringUntil(':').toInt();
-      is_go_separating = Serial.readStringUntil('\n').toInt();
+      // spr_duty = Serial.readStringUntil(':').toInt();
+      // is_go_separating = Serial.readStringUntil('\n').toInt();
+      is_go_separating = true;
     }
 
     else if (mode == 'r') {
@@ -65,6 +66,11 @@ void loop() {
   }
   int16_t enc_diff = Inc_enc::get_diff(SPR_ENC_NUM);
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
+  unsigned long time_now = micros() / 1000;
+  Serial.print(time_now);
+  Serial.print(",");
+  Serial.print(stop_start_time);
+  Serial.print(",");
   Serial.print(enc_diff);
   Serial.print(",");
   Serial.print(enc_count);
@@ -99,18 +105,22 @@ void loop() {
     if (enc_count < ONE_WAY_COUNT) {
       digitalWrite(24, LOW);
       duty = spr_duty;
+      stop_start_time = micros() / 1000;
     } else {
       is_go_separating = false;
-      is_come_separating = true;
+      is_stopping = true;
     }
   } else if (is_come_separating && !is_go_separating) {
-    if (enc_count > 50) {
+    if (enc_count > 100) {
       digitalWrite(23, LOW);
       duty = -spr_duty;
     } else {
       is_come_separating = false;
       duty = 0;
     }
+  } else if (is_stopping && (time_now - stop_start_time > STOP_TIME)) {
+    is_come_separating = true;
+    is_stopping = false;
   } else {
     is_go_separating = false;
     is_come_separating = false;
