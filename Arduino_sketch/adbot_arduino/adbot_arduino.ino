@@ -1,8 +1,11 @@
 #include "cubic_arduino.h"
 #include <ros.h>
 #include <std_msgs/Int16.h>
+#include <std_msgs/Int32.h>
+#include <std_msgs/Float64.h>
+#include <std_msgs/Bool.h>
 
-#include <adbot_msgs/SprMsg.h>
+// #include <adbot_msgs/SprMsg.h>
 
 ///初期状態は下の刃でリングを受け止めている状態を想定///
 #define SPR_MOTOR 11       // 分離のモーター番号
@@ -11,7 +14,7 @@
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
-int spr_indicated_duty = 250;   //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
+int spr_indicated_duty = 250;       //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
 int spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
 
 bool spr_sign = false;
@@ -43,9 +46,8 @@ void cmdToggleBeltCb(const std_msgs::Bool &belt_msg) {
 }
 void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 }
-// void cmdEmergencyStopCb(const std_msgs::Bool &stop_msg){
-
-// }
+void cmdEmergencyStopCb(const std_msgs::Bool &stop_msg) {
+}
 
 // トピックを受け取るためのサブスクライバーを作成
 // 分離
@@ -68,8 +70,13 @@ void setup() {
 
   // ROSの通信を開始
   nh.initNode();
-  nh.subscribe(sub);
-  nh.subscribe(term_sub);
+  nh.subscribe(cmd_toggle_shoot_sub);
+  nh.subscribe(term_spr_sub);
+  nh.subscribe(cmd_shooting_duty_sub);
+  nh.subscribe(cmd_angle_sub);
+  nh.subscribe(cmd_toggle_receive_sub);
+  nh.subscribe(cmd_toggle_belt_sub);
+  nh.subscribe(cmd_emergency_stop_sub);
 
   // 分離デバッグ用
   digitalWrite(23, HIGH);
@@ -79,7 +86,7 @@ void setup() {
 void loop() {
   nh.spinOnce();
 
-  spr_set_duty()
+  spr_set_duty();
 
   DC_motor::put(SPR_MOTOR, spr_duty);  //dutyをセット
 
@@ -87,7 +94,7 @@ void loop() {
   Cubic::update();
 }
 
-void spr_set_duty(){
+void spr_set_duty() {
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
 
   // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
