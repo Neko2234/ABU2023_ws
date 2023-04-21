@@ -1,11 +1,12 @@
-#include "cubic_arduino.h"
+#include <Arduino.h>
 #include <ros.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Bool.h>
-
-// #include <adbot_msgs/SprMsg.h>
+#include "cubic_arduino.h"
+#include "PID.h"
+#include "Cubic.controller.h"
 
 ///初期状態は下の刃でリングを受け止めている状態を想定///
 #define SPR_MOTOR 11       // 分離のモーター番号
@@ -14,17 +15,28 @@
 #define STOP_COUNT 1000
 #define ENC_DIFF_MIN 5
 
+using namespace Cubic_controller;
+
 int spr_indicated_duty = 250;       //指定するDutyの絶対値ROSメッセージから指定できる メインなら70、サブなら250
 int spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
+double target = 2.25; // 正面
 
 bool spr_sign = false;
 bool spr_pre_sign = false;
 bool spr_is_go_separating = false;    //初期位置から折り返しまでの間は真
 bool spr_is_come_separating = false;  //折り返しから初期位置までの間は真
 
+void publish(void);
 void spr_set_duty(void);
 
 ros::NodeHandle nh;
+std_msgs::Float64 angle_diff;
+std_msgs::Float64 angle;
+std_msgs::Int16 duty;
+// bool_msg.data = false;
+ros::Publisher pub_angle_diff("angle_diff", &angle_diff);
+ros::Publisher pub_angle("angle", &angle);
+ros::Publisher pub_duty("duty", &duty);
 
 // トピックのコールバック関数
 // 分離
@@ -39,6 +51,8 @@ void termSprCb(const std_msgs::Int16 &msg) {
 void cmdShootingDutyCb(const std_msgs::Int32 &duty_msg) {
 }
 void cmdAngleCb(const std_msgs::Float64 &angle_msg) {
+  target = degToRad(angle_msg.data) + 2.25;
+  // target = cmd_angle.data + 2.25;
 }
 void cmdToggleReceiveCb(const std_msgs::Bool &recieve_msg) {
 }
@@ -49,7 +63,7 @@ void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 void cmdEmergencyStopCb(const std_msgs::Bool &stop_msg) {
 }
 
-// トピックを受け取るためのサブスクライバーを作成
+// トピックを受け取るためのサブスクライバーのコンポーネントを作成
 // 分離
 ros::Subscriber<std_msgs::Bool> cmd_toggle_shoot_sub("cmd_toggle_shoot", &cmdToggleShootCb);
 ros::Subscriber<std_msgs::Int16> term_spr_sub("term_spr", &termSprCb);
@@ -61,8 +75,10 @@ ros::Subscriber<std_msgs::Bool> cmd_toggle_belt_sub("cmd_toggle_belt", &cmdToggl
 ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cmdEmergencyStopCb);
 
 void setup() {
+  //分離デバッグ用
   pinMode(24, OUTPUT);
   pinMode(23, OUTPUT);
+  
   // すべてのモータ，エンコーダの初期化
   Cubic::begin(3.0);
   Inc_enc::reset();
@@ -70,6 +86,8 @@ void setup() {
 
   // ROSの通信を開始
   nh.initNode();
+
+  //サブスクライバ
   nh.subscribe(cmd_toggle_shoot_sub);
   nh.subscribe(term_spr_sub);
   nh.subscribe(cmd_shooting_duty_sub);
@@ -84,14 +102,49 @@ void setup() {
 }
 
 void loop() {
-  nh.spinOnce();
-
+  // 分離のDuty決定
   spr_set_duty();
 
   DC_motor::put(SPR_MOTOR, spr_duty);  //dutyをセット
+  set_position();
 
   // データの送受信を行う
   Cubic::update();
+  // メッセージを送信
+  publish();
+
+  nh.spinOnce();
+}
+
+void set_position(){
+  static Velocity_PID velocityPID(3, 0, encoderType::inc, 2048 * 4, 0.5, 0.5, 0.5, 0.1, 0.4, false, true);
+  static Position_PID positionPID(3, 0, encoderType::abs, AMT22_CPR, 0.2, 0.25, 0.0, 0.0, target, true, true);
+  static bool stopFlag = false;
+  if (stopFlag)
+  {
+    // Serial.println("stopping...");
+    for (int i = 0; i < 8; i++)
+    {
+      DC_motor::put(i, 0);
+    }
+  }
+  else
+  {
+    // velocityPID.compute();
+    positionPID.setTarget(target);
+    positionPID.compute();
+    duty.data = DC_motor::get(3);
+  }  
+
+  angle_diff.data = abs(positionPID.getTarget() - positionPID.getCurrent());
+  angle.data = positionPID.getCurrent() - 2.25;
+  angle.data = radToDeg(angle.data);
+}
+
+void publish(){
+  pub_angle_diff.publish(&angle_diff);
+  pub_angle.publish(&angle);
+  pub_duty.publish(&duty);
 }
 
 void spr_set_duty() {
