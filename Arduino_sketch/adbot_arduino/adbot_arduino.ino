@@ -7,18 +7,22 @@
 #include "PID.h"
 #include "Cubic.controller.h"
 
+// デバッグ用。LEDでデバッグする際はコメントを外す
+// #define SPR_DEBUG
+// #define AIM_DEBUG
+// #define BELT_DEBUG
+
 /*初期状態は下の刃でリングを受け止めている状態を想定*/
-#define SPR_MOTOR 8        // 分離のモーター番号
-#define SPR_ENC_NUM 0      // 分離のエンコーダ番号
-#define ONE_WAY_COUNT 400  //片道のエンコーダカウント
-#define STOP_COUNT 1000
-#define ENC_DIFF_MIN 5
+#define SPR_MOTOR 8          // 分離のモーター番号
+#define SPR_ENC_NUM 0        // 分離のエンコーダ番号
+#define ONE_WAY_COUNT 400    //片道のエンコーダカウント
 #define SPR_STOP_ENC 500000  // 分離で片道を行った後折り返すまでに止まっている時間(us)
 
-#define ZERO 0.000000001      // floatにおける等価演算のまるめ
-#define AIM_ENC 0             // 照準エンコーダ
-#define TARGET_DIFF_THRESH 0.10471973  // 位置PIDか手動かの閾値(rad)この値は6度
-#define ROT_TIME_FIVE 1000000    // 照準を5度動かすために必要な時間(us)
+#define AIM_ENC 0                      // 照準エンコーダ
+#define TARGET_DIFF_THRESH 0.10471973  // 位置PIDか手動かの閾値(rad).この値は6度
+#define ROT_TIME_FIVE 500000           // 照準を5度動かすために必要な時間(us)　**未調整**
+#define REC_POS_R 0                    // 向かって右でリングを受け取るときの角度(rad)　**未調整**
+#define REC_POS_L 0                    // 向かって左でリングを受け取るときの角度(rad)　**未調整**
 
 // DCモータ番号
 #define SHOOT_MOTOR_LU 3  // 左上
@@ -26,7 +30,7 @@
 #define SHOOT_MOTOR_RU 6  // 右上
 #define SHOOT_MOTOR_RD 0  // 右下
 #define BELT_MOTOR 1      // ベルト
-#define AIM_MOTOR 7       // 昇降
+#define AIM_MOTOR 7       // 照準
 
 using namespace Cubic_controller;
 
@@ -43,11 +47,11 @@ bool is_rotating = false;
 double target = 0;  // 正面
 double pre_target = 0;
 unsigned long rot_start_time = 0;
-int16_t rot_duty = 70;
+int16_t rot_duty = 70;  // 手動で動かすときの照準のDuty　**未調整**
 //射出
 bool is_moving_belt = false;
-int16_t belt_duty = 300;
-int16_t shoot_duty = 0;  // 射出のDuty
+int16_t belt_duty = 300;  // ベルトのDuty、コマンドから操作可能
+int16_t shoot_duty = 0;   // 射出のDuty
 
 ros::NodeHandle nh;
 std_msgs::Float64 angle_diff;
@@ -107,13 +111,17 @@ void spr_set_duty() {
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
   unsigned long time_now = micros();
 
-  // digitalWrite(23, HIGH);
-  // digitalWrite(24, HIGH);
+#ifdef SPR_DEBUG
+  digitalWrite(23, HIGH);
+  digitalWrite(24, HIGH);
+#endif
 
   //両方とも真のときは停止してふたつとも偽とする
   if (spr_is_go_separating && !spr_is_come_separating) {
     if (enc_count < ONE_WAY_COUNT) {
-      // digitalWrite(24, LOW);
+#ifdef SPR_DEBUG
+      digitalWrite(24, LOW);
+#endif
       spr_duty = spr_indicated_duty;
       spr_stop_start_time = micros();
     } else {
@@ -122,7 +130,9 @@ void spr_set_duty() {
     }
   } else if (spr_is_come_separating && !spr_is_go_separating) {
     if (enc_count > 100) {
-      // digitalWrite(23, LOW);
+#ifdef SPR_DEBUG
+      digitalWrite(23, LOW);
+#endif
       spr_duty = -spr_indicated_duty;
     } else {
       spr_is_come_separating = false;
@@ -145,6 +155,7 @@ void publish() {
 }
 
 void set_position() {
+  //p項で大きい範囲をある程度の精度で制御できるようになったらi項で最小単位分移動させて精度を高める
   static Position_PID positionPID(AIM_MOTOR, AIM_ENC, encoderType::abs, AMT22_CPR, 0.1, 2.8, 0.02, 0.0, target, true, false);
   angle_diff.data = abs(positionPID.getTarget() - positionPID.getCurrent());
   angle.data = positionPID.getCurrent();
@@ -158,15 +169,21 @@ void set_position() {
   if (abs(target_diff) > TARGET_DIFF_THRESH) {
     positionPID.setTarget(target);
     positionPID.compute();
+#ifdef AIM_DEBUG
     digitalWrite(23, HIGH);
     digitalWrite(24, HIGH);
+#endif
   } else if (!is_rotating && (target_diff != 0)) {
     if (target_diff > 0) {
       DC_motor::put(AIM_MOTOR, rot_duty);
+#ifdef AIM_DEBUG
       digitalWrite(23, LOW);
+#endif
     } else if (target_diff < 0) {
       DC_motor::put(AIM_MOTOR, -rot_duty);
+#ifdef AIM_DEBUG
       digitalWrite(24, LOW);
+#endif
     }
     is_rotating = true;
     rot_start_time = micros();
@@ -175,15 +192,17 @@ void set_position() {
     target_diff = 0;
     pre_target = target;
     DC_motor::put(AIM_MOTOR, 0);
+#ifdef AIM_DEBUG
     digitalWrite(23, HIGH);
     digitalWrite(24, HIGH);
+#endif
   }
 }
 
 void setup() {
   // デバッグ用
-  pinMode(23, OUTPUT); // blue
-  pinMode(24, OUTPUT); // green
+  pinMode(23, OUTPUT);  // blue
+  pinMode(24, OUTPUT);  // green
   digitalWrite(23, HIGH);
   digitalWrite(24, HIGH);
 
@@ -222,19 +241,19 @@ void loop() {
     spr_is_come_separating = false;
   }
 
-  // if (is_moving_belt) digitalWrite(23, LOW);
-  // else digitalWrite(23, HIGH);
-  // if (emergency_stop) digitalWrite(24, HIGH);
-  // else digitalWrite(24, LOW);
+#ifdef BELT_DEBUG
+  if (is_moving_belt) digitalWrite(23, LOW);
+  else digitalWrite(23, HIGH);
+  if (emergency_stop) digitalWrite(24, HIGH);
+  else digitalWrite(24, LOW);
+#endif
+
   // 分離のDuty決定
   spr_set_duty();
-
+  // 照準を定める
   set_position();
 
   publish();
-  // pub_angle_diff.publish(&angle_diff);
-  // pub_angle.publish(&angle);
-  // pub_duty.publish(&duty);
 
   //dutyをセット
   if (is_moving_belt) {
