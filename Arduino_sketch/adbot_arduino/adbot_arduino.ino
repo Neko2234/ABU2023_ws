@@ -87,8 +87,12 @@ ros::Subscriber<std_msgs::Int32> cmd_shooting_duty_sub("cmd_shooting_duty", &cmd
 ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cmdEmergencyStopCb);
 
 void setup() {
-  pinMode(24, OUTPUT);
+  // 分離デバッグ用
   pinMode(23, OUTPUT);
+  pinMode(24, OUTPUT);
+  digitalWrite(23, HIGH);
+  digitalWrite(24, HIGH);
+
   // すべてのモータ，エンコーダの初期化
   Cubic::begin(3.0);
   Inc_enc::reset();
@@ -106,10 +110,6 @@ void setup() {
   nh.subscribe(cmd_toggle_belt_sub);
   nh.subscribe(cmd_emergency_stop_sub);
   nh.subscribe(term_belt_duty_sub);
-
-  // 分離デバッグ用
-  digitalWrite(23, HIGH);
-  digitalWrite(24, HIGH);
 }
 
 void loop() {
@@ -122,12 +122,21 @@ void loop() {
     spr_is_go_separating = false;
     spr_is_come_separating = false;
   }
+
+  if (is_moving_belt) digitalWrite(23, LOW);
+  else digitalWrite(23, HIGH);
+  if (emergency_stop) digitalWrite(24, HIGH);
+  else digitalWrite(24, LOW);
   // 分離のDuty決定
   spr_set_duty();
 
   //dutyをセット
-  DC_motor::put(BELT_MOTOR, belt_duty);
-  DC_motor::put(SHOOT_MOTOR_LU, shoot_duty);
+  if (is_moving_belt) {
+    DC_motor::put(BELT_MOTOR, belt_duty);
+  } else {
+    DC_motor::put(BELT_MOTOR, 0);
+  }
+  DC_motor::put(SHOOT_MOTOR_LU, -shoot_duty);
   DC_motor::put(SHOOT_MOTOR_LD, -shoot_duty);
   DC_motor::put(SHOOT_MOTOR_RU, shoot_duty);
   DC_motor::put(SHOOT_MOTOR_RD, -shoot_duty);
@@ -145,13 +154,13 @@ void spr_set_duty() {
   if (spr_sign && !spr_pre_sign) {
     spr_is_go_separating = true;
   }
-  digitalWrite(23, HIGH);
-  digitalWrite(24, HIGH);
+  // digitalWrite(23, HIGH);
+  // digitalWrite(24, HIGH);
 
   //両方とも真のときは停止してふたつとも偽とする
   if (spr_is_go_separating && !spr_is_come_separating) {
     if (enc_count < ONE_WAY_COUNT) {
-      digitalWrite(24, LOW);
+      // digitalWrite(24, LOW);
       spr_duty = spr_indicated_duty;
       spr_stop_start_time = micros() / 1000;
     } else {
@@ -160,7 +169,7 @@ void spr_set_duty() {
     }
   } else if (spr_is_come_separating && !spr_is_go_separating) {
     if (enc_count > 100) {
-      digitalWrite(23, LOW);
+      // digitalWrite(23, LOW);
       spr_duty = -spr_indicated_duty;
     } else {
       spr_is_come_separating = false;
