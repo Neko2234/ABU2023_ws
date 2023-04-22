@@ -44,7 +44,7 @@ bool spr_is_stopping = false;
 unsigned long spr_stop_start_time = 0;
 // 照準
 bool is_rotating = false;
-double target = 0;  // 正面
+double target = 0;  // 正面　**未調整**
 double pre_target = 0;
 unsigned long rot_start_time = 0;
 int16_t rot_duty = 70;  // 手動で動かすときの照準のDuty　**未調整**
@@ -159,7 +159,11 @@ void publish() {
 
 void set_position() {
   //p項で大きい範囲をある程度の精度で制御できるようになったらi項で最小単位分移動させて精度を高める
-  static Position_PID positionPID(AIM_MOTOR, AIM_ENC, encoderType::abs, AMT22_CPR, 0.1, 2.8, 0.02, 0.0, target, true, false);
+  const double capable_duty = 0.1;
+  const double Kp = 2.8;
+  const double Ki = 0.02;
+  const double Kd = 0.0;
+  static Position_PID positionPID(AIM_MOTOR, AIM_ENC, encoderType::abs, AMT22_CPR, capable_duty, Kp, Ki, Kd, target, true, false);
   angle_diff.data = abs(positionPID.getTarget() - positionPID.getCurrent());
   angle.data = positionPID.getCurrent();
   angle.data = radToDeg(angle.data);
