@@ -75,6 +75,9 @@ void cmdAngleCb(const std_msgs::Float64 &angle_msg) {
   target = angle_msg.data;
 }
 void cmdToggleReceiveCb(const std_msgs::Bool &recieve_msg) {
+  // tureのとき向かって右、falseのとき向かって左で受け取り体勢
+  if (recieve_msg.data) target = REC_POS_R;
+  else target = REC_POS_L;
 }
 void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 }
