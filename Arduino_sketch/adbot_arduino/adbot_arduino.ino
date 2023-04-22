@@ -1,9 +1,12 @@
-#include "cubic_arduino.h"
+#include <Arduino.h>
 #include <ros.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Bool.h>
+#include "cubic_arduino.h"
+#include "PID.h"
+#include "Cubic.controller.h"
 
 // #include <adbot_msgs/SprMsg.h>
 
@@ -22,6 +25,8 @@
 #define SHOOT_MOTOR_RD 0  // 右下
 #define BELT_MOTOR 6      // ベルト
 
+using namespace Cubic_controller;
+
 bool emergency_stop = false;
 //分離
 int32_t spr_indicated_duty = 70;        //指定するDutyの絶対値。ROSメッセージから指定できる。
@@ -32,14 +37,20 @@ bool spr_is_go_separating = false;    //初期位置から折り返しまでの�
 bool spr_is_come_separating = false;  //折り返しから初期位置までの間は真
 bool spr_is_stopping = false;
 unsigned long spr_stop_start_time = 0;
+// 照準
+double target = 2.25;  // 正面
 //射出
 bool is_moving_belt = false;
 int32_t belt_duty = 300;
 int32_t shoot_duty = 0;  // 射出のDuty
 
-void spr_set_duty(void);
-
 ros::NodeHandle nh;
+std_msgs::Float64 angle_diff;
+std_msgs::Float64 angle;
+std_msgs::Int16 duty;
+ros::Publisher pub_angle_diff("angle_diff", &angle_diff);
+ros::Publisher pub_angle("angle", &angle);
+ros::Publisher pub_duty("duty", &duty);
 
 // トピックのコールバック関数
 // 分離
@@ -51,11 +62,13 @@ void termSprCb(const std_msgs::Int32 &msg) {
   spr_indicated_duty = msg.data;
 }
 //照準
-void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
-}
 void cmdAngleCb(const std_msgs::Float64 &angle_msg) {
+  target = degToRad(angle_msg.data) + 2.25;
+  // target = cmd_angle.data + 2.25;
 }
 void cmdToggleReceiveCb(const std_msgs::Bool &recieve_msg) {
+}
+void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 }
 // 射出
 void cmdToggleBeltCb(const std_msgs::Bool &belt_msg) {
@@ -96,7 +109,7 @@ void setup() {
   // すべてのモータ，エンコーダの初期化
   Cubic::begin(3.0);
   Inc_enc::reset();
-  nh.getHardware()->setBaud(9600);
+  nh.getHardware()->setBaud(2000000);
 
   // ROSの通信を開始
   nh.initNode();
@@ -116,7 +129,7 @@ void loop() {
   nh.spinOnce();
   // 緊急停止信号が来たらすべて停止
   if (emergency_stop) {
-    for (int i; i < DC_MOTOR_NUM; i++) {
+    for (int i=0; i < DC_MOTOR_NUM; i++) {
       DC_motor::put(i, 0);
     }
     spr_is_go_separating = false;
@@ -129,6 +142,13 @@ void loop() {
   else digitalWrite(24, LOW);
   // 分離のDuty決定
   spr_set_duty();
+
+  set_position();
+
+  // publish();
+  // pub_angle_diff.publish(&angle_diff);
+  // pub_angle.publish(&angle);
+  // pub_duty.publish(&duty);
 
   //dutyをセット
   if (is_moving_belt) {
@@ -144,6 +164,33 @@ void loop() {
 
   // データの送受信を行う
   Cubic::update();
+}
+
+// void publish() {
+//   pub_angle_diff.publish(&angle_diff);
+//   pub_angle.publish(&angle);
+//   pub_duty.publish(&duty);
+// }
+
+void set_position() {
+  static Velocity_PID velocityPID(3, 0, encoderType::inc, 2048 * 4, 0.5, 0.5, 0.5, 0.1, 0.4, false, true);
+  static Position_PID positionPID(3, 0, encoderType::abs, AMT22_CPR, 0.2, 0.25, 0.0, 0.0, target, true, true);
+  static bool stopFlag = false;
+  if (stopFlag) {
+    // Serial.println("stopping...");
+    for (int i = 0; i < 8; i++) {
+      DC_motor::put(i, 0);
+    }
+  } else {
+    // velocityPID.compute();
+    positionPID.setTarget(target);
+    positionPID.compute();
+    duty.data = DC_motor::get(3);
+  }
+
+  angle_diff.data = abs(positionPID.getTarget() - positionPID.getCurrent());
+  angle.data = positionPID.getCurrent() - 2.25;
+  angle.data = radToDeg(angle.data);
 }
 
 void spr_set_duty() {
