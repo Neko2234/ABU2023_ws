@@ -22,6 +22,7 @@
 #define SHOOT_MOTOR_RD 3  // 右下
 #define BELT_MOTOR 6      // ベルト
 
+bool emergency_stop = false;
 //分離
 int32_t spr_indicated_duty = 70;        //指定するDutyの絶対値。ROSメッセージから指定できる。
 int32_t spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
@@ -56,7 +57,9 @@ void cmdToggleBeltCb(const std_msgs::Bool &belt_msg) {
 }
 void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 }
+// 緊急停止
 void cmdEmergencyStopCb(const std_msgs::Bool &stop_msg) {
+  emergency_stop = stop_msg.data;
 }
 
 // トピックを受け取るためのサブスクライバーを作成
@@ -95,7 +98,15 @@ void setup() {
 
 void loop() {
   nh.spinOnce();
-
+  // 緊急停止信号が来たらすべて停止
+  if (emergency_stop) {
+    for (int i; i < DC_MOTOR_NUM; i++) {
+      DC_motor::put(i, 0);
+    }
+    spr_is_go_separating = false;
+    spr_is_come_separating = false;
+  }
+  // 分離のDuty決定
   spr_set_duty();
 
   DC_motor::put(SPR_MOTOR, spr_duty);  //dutyをセット
