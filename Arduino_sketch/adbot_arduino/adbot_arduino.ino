@@ -33,8 +33,6 @@ bool emergency_stop = false;
 //分離
 int32_t spr_indicated_duty = 70;        //指定するDutyの絶対値。ROSメッセージから指定できる。
 int32_t spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
-bool spr_sign = false;
-bool spr_pre_sign = false;
 bool spr_is_go_separating = false;    //初期位置から折り返しまでの間は真
 bool spr_is_come_separating = false;  //折り返しから初期位置までの間は真
 bool spr_is_stopping = false;
@@ -57,8 +55,7 @@ ros::Publisher pub_duty("duty", &duty);
 // トピックのコールバック関数
 // 分離
 void cmdToggleShootCb(const std_msgs::Bool &spr_msg) {
-  spr_pre_sign = spr_sign;
-  spr_sign = spr_msg.data;
+  spr_is_go_separating = spr_msg.data;
 }
 void termSprCb(const std_msgs::Int32 &msg) {
   spr_indicated_duty = msg.data;
@@ -104,11 +101,7 @@ ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cm
 void spr_set_duty() {
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
   unsigned long time_now = micros() / 1000;
-
-  // 立ち上がり(スイッチを押した瞬間)で分離実行を切り替え
-  if (spr_sign && !spr_pre_sign) {
-    spr_is_go_separating = true;
-  }
+  
   // digitalWrite(23, HIGH);
   // digitalWrite(24, HIGH);
 
