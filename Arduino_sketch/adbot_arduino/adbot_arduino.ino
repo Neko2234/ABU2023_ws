@@ -94,6 +94,7 @@ void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 // 射出
 void cmdAngleAdjustCb(const std_msgs::Int16 &angle_msg) {
   aim_mode = angle_msg.data;
+  nh.loginfo("angle adjusted");
 }
 void cmdToggleBeltCb(const std_msgs::Bool &belt_msg) {
   is_moving_belt = belt_msg.data;
@@ -178,7 +179,7 @@ void manual_set_position() {
   unsigned long now_time = micros();
   unsigned long dt = now_time - rot_start_time;
 
-  if (abs(aim_mode) > 0 && !is_rotating) {
+  if ((aim_mode != 0) && !is_rotating) {
     if (abs(aim_mode) == 1) rot_time = ROT_SHORT_TIME;
     else if (abs(aim_mode) == 2) rot_time = ROT_MIDDLE_TIME;
     else if (abs(aim_mode) == 3) rot_time = ROT_LONG_TIME;
@@ -193,7 +194,7 @@ void manual_set_position() {
     digitalWrite(23, LOW);
     digitalWrite(24, LOW);
 #endif
-  } else if (is_rotating && (dt > rot_time)) {
+  } else if ((dt > rot_time) && is_rotating) {
     DC_motor::put(AIM_MOTOR, 0);
     is_rotating = false;
 #ifdef AIM_DEBUG
