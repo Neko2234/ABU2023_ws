@@ -205,11 +205,13 @@ void manual_set_position() {
 
 void pid_set_position() {
   //p項で大きい範囲をある程度の精度で制御できるようになったらi項で最小単位分移動させて精度を高める
-  const double capable_duty = 0.1;
+  const double capable_duty = 0.15;
   const double Kp = 2.8;
   const double Ki = 0.02;
   const double Kd = 0.0;
   static Position_PID positionPID(AIM_MOTOR, AIM_ENC, encoderType::abs, AMT22_CPR, capable_duty, Kp, Ki, Kd, target, true, false);
+  positionPID.setTarget(target);
+  positionPID.compute();
   angle_diff.data = abs(positionPID.getTarget() - positionPID.getCurrent());
   angle.data = positionPID.getCurrent();
   angle.data = radToDeg(angle.data);
@@ -265,7 +267,7 @@ void loop() {
   pid_set_position();
   // manual_set_position();
 
-  DC_motor::put(AIM_MOTOR, aim_duty);
+  // DC_motor::put(AIM_MOTOR, aim_duty);
 
   // publish();
 
