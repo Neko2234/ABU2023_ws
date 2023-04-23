@@ -23,6 +23,9 @@
 #define ROT_TIME_FIVE 500000           // 照準を5度動かすために必要な時間(us)　**未調整**
 #define REC_POS_R 0                    // 向かって右でリングを受け取るときの角度(rad)　**未調整**
 #define REC_POS_L 0                    // 向かって左でリングを受け取るときの角度(rad)　**未調整**
+#define ROT_TIME_FIVE 1000000          // 照準を5度動かすために必要な時間(us)
+
+#define SHT_DUTY_BIUS 50 // 射出Dutyにかけるバイアス項
 
 // DCモータ番号
 #define SHOOT_MOTOR_LU 5  // 左上
@@ -274,9 +277,9 @@ void loop() {
   } else {
     DC_motor::put(BELT_MOTOR, 0);
   }
-  DC_motor::put(SHOOT_MOTOR_LU, -shoot_duty);
+  DC_motor::put(SHOOT_MOTOR_LU, -(shoot_duty + SHT_DUTY_BIUS));
   DC_motor::put(SHOOT_MOTOR_LD, -shoot_duty);
-  DC_motor::put(SHOOT_MOTOR_RU, shoot_duty);
+  DC_motor::put(SHOOT_MOTOR_RU, (shoot_duty + SHT_DUTY_BIUS));
   DC_motor::put(SHOOT_MOTOR_RD, -shoot_duty);
   DC_motor::put(SPR_MOTOR, spr_duty);
 
