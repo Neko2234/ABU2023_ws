@@ -8,35 +8,35 @@
 #include "Cubic.controller.h"
 
 // デバッグ用。LEDでデバッグする際はコメントを外す
-// #define SPR_DEBUG
+#define SPR_DEBUG
 // #define AIM_DEBUG
 // #define BELT_DEBUG
 
 /*初期状態は下の刃でリングを受け止めている状態を想定*/
 #define SPR_MOTOR 8          // 分離のモーター番号
-#define SPR_ENC_NUM 0        // 分離のエンコーダ番号
-#define ONE_WAY_COUNT 400    //片道のエンコーダカウント
+#define SPR_ENC_NUM 0        // 分離のIncエンコーダ番号
+#define ONE_WAY_COUNT 700    //片道のエンコーダカウント
 #define SPR_STOP_ENC 500000  // 分離で片道を行った後折り返すまでに止まっている時間(us)
 
-#define AIM_ENC 0                      // 照準エンコーダ
+#define AIM_ENC 0                      // 照準Absエンコーダ
 #define TARGET_DIFF_THRESH 0.10471973  // 位置PIDか手動かの閾値(rad).この値は6度
 #define ROT_TIME_FIVE 500000           // 照準を5度動かすために必要な時間(us)　**未調整**
 #define REC_POS_R 0                    // 向かって右でリングを受け取るときの角度(rad)　**未調整**
 #define REC_POS_L 0                    // 向かって左でリングを受け取るときの角度(rad)　**未調整**
 
 // DCモータ番号
-#define SHOOT_MOTOR_LU 3  // 左上
-#define SHOOT_MOTOR_LD 2  // 左下
-#define SHOOT_MOTOR_RU 6  // 右上
+#define SHOOT_MOTOR_LU 5  // 左上
+#define SHOOT_MOTOR_LD 4  // 左下
+#define SHOOT_MOTOR_RU 1  // 右上
 #define SHOOT_MOTOR_RD 0  // 右下
-#define BELT_MOTOR 1      // ベルト
+#define BELT_MOTOR 6      // ベルト
 #define AIM_MOTOR 7       // 照準
 
 using namespace Cubic_controller;
 
 bool emergency_stop = false;
 //分離
-int16_t spr_indicated_duty = 70;        //指定するDutyの絶対値。ROSメッセージから指定できる。
+int16_t spr_indicated_duty = 150;       //指定するDutyの絶対値。ROSメッセージから指定できる。
 int16_t spr_duty = spr_indicated_duty;  //実際にCubicに指定する値
 bool spr_is_go_separating = false;      //初期位置から折り返しまでの間は真
 bool spr_is_come_separating = false;    //折り返しから初期位置までの間は真
@@ -48,6 +48,7 @@ double target = 0;  // 正面　**未調整**
 double pre_target = 0;
 unsigned long rot_start_time = 0;
 int16_t rot_duty = 70;  // 手動で動かすときの照準のDuty　**未調整**
+int16_t aim_duty = 0;
 //射出
 bool is_moving_belt = false;
 int16_t belt_duty = 300;  // ベルトのDuty、コマンドから操作可能
@@ -79,6 +80,10 @@ void cmdToggleReceiveCb(const std_msgs::Bool &recieve_msg) {
   if (recieve_msg.data) target = REC_POS_R;
   else target = REC_POS_L;
 }
+void cmdAimCb(const std_msgs::Int16 &aim_msg) {
+  aim_duty = aim_msg.data;
+  nh.loginfo("duty updated");
+}
 void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 }
 // 射出
@@ -93,6 +98,7 @@ void cmdShootingDutyCb(const std_msgs::Int16 &duty_msg) {
 }
 // 緊急停止
 void cmdEmergencyStopCb(const std_msgs::Bool &stop_msg) {
+  nh.loginfo("receiving emergency");
   emergency_stop = stop_msg.data;
 }
 
@@ -103,6 +109,7 @@ ros::Subscriber<std_msgs::Int16> term_spr_sub("term_spr", &termSprCb);
 //照準
 ros::Subscriber<std_msgs::Float64> cmd_angle_sub("cmd_angle", &cmdAngleCb);
 ros::Subscriber<std_msgs::Bool> cmd_toggle_receive_sub("cmd_toggle_receive", &cmdToggleReceiveCb);
+ros::Subscriber<std_msgs::Int16> cmd_aim_sub("cmd_aim", &cmdAimCb);
 // 射出
 ros::Subscriber<std_msgs::Bool> cmd_toggle_belt_sub("cmd_toggle_belt", &cmdToggleBeltCb);
 ros::Subscriber<std_msgs::Int16> term_belt_duty_sub("term_belt_duty", &termBeltDutyCb);
@@ -113,7 +120,9 @@ ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cm
 void spr_set_duty() {
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
   unsigned long time_now = micros();
-
+  char buf[100];
+  sprintf(buf,"%d",enc_count);
+  nh.loginfo(buf);
 #ifdef SPR_DEBUG
   digitalWrite(23, HIGH);
   digitalWrite(24, HIGH);
@@ -194,11 +203,13 @@ void set_position() {
     }
     is_rotating = true;
     rot_start_time = micros();
+    positionPID.reset();
   } else if (dt > ROT_TIME_FIVE) {  // 回転している時間が閾値を越えたら止める
     is_rotating = false;
     target_diff = 0;
     pre_target = target;
     DC_motor::put(AIM_MOTOR, 0);
+    positionPID.reset();
 #ifdef AIM_DEBUG
     digitalWrite(23, HIGH);
     digitalWrite(24, HIGH);
@@ -231,6 +242,7 @@ void setup() {
   nh.subscribe(term_spr_sub);
   nh.subscribe(cmd_shooting_duty_sub);
   nh.subscribe(cmd_angle_sub);
+  nh.subscribe(cmd_aim_sub);
   nh.subscribe(cmd_toggle_receive_sub);
   nh.subscribe(cmd_toggle_belt_sub);
   nh.subscribe(cmd_emergency_stop_sub);
@@ -239,14 +251,6 @@ void setup() {
 
 void loop() {
   nh.spinOnce();
-  // 緊急停止信号が来たらすべて停止
-  if (emergency_stop) {
-    for (int i = 0; i < DC_MOTOR_NUM; i++) {
-      DC_motor::put(i, 0);
-    }
-    spr_is_go_separating = false;
-    spr_is_come_separating = false;
-  }
 
 #ifdef BELT_DEBUG
   if (is_moving_belt) digitalWrite(23, LOW);
@@ -258,9 +262,11 @@ void loop() {
   // 分離のDuty決定
   spr_set_duty();
   // 照準を定める
-  set_position();
+  // set_position();
 
-  publish();
+  DC_motor::put(AIM_MOTOR, aim_duty);
+
+  // publish();
 
   //dutyをセット
   if (is_moving_belt) {
@@ -273,6 +279,16 @@ void loop() {
   DC_motor::put(SHOOT_MOTOR_RU, shoot_duty);
   DC_motor::put(SHOOT_MOTOR_RD, -shoot_duty);
   DC_motor::put(SPR_MOTOR, spr_duty);
+
+
+  // 緊急停止信号が来たらすべて停止
+  if (emergency_stop) {
+    for (int i = 0; i < DC_MOTOR_NUM; i++) {
+      DC_motor::put(i, 0);
+    }
+    spr_is_go_separating = false;
+    spr_is_come_separating = false;
+  }
 
   // データの送受信を行う
   Cubic::update();

@@ -224,7 +224,15 @@ uint16_t Abs_enc::get(const uint8_t num){
     }
     else {
         // 正しく読めた場合
-        return remove_parity_bit(ret);
+        // return remove_parity_bit(ret);
+        // 射出対応用！！！！！ キャリブレーションするまで消すな！！！！
+        uint16_t value = remove_parity_bit(ret);
+        if(value<=ABS_ENC_MAX - 4605){
+          value += 4605;
+        }else{
+          value -= ABS_ENC_MAX - 4605 + 1;
+        }
+        return value;
     }
 }
 
