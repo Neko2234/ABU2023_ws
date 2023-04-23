@@ -49,14 +49,13 @@ unsigned long spr_stop_start_time = 0;
 int16_t aim_mode;  // 手動照準のモード
 bool is_rotating = false;
 double target = 0;  // 正面　**未調整**
-double pre_target = 0;
 unsigned long rot_start_time = 0;
 int16_t rot_duty = 70;       // 手動で動かすときの照準のDuty　**未調整**
 unsigned long rot_time = 0;  //移動する時間を入れる。
 int16_t aim_duty = 0;
 //射出
 bool is_moving_belt = false;
-int16_t belt_duty = 300;  // ベルトのDuty、コマンドから操作可能
+int16_t belt_duty = 500;  // ベルトのDuty、コマンドから操作可能
 int16_t shoot_duty = 0;   // 射出のDuty
 
 ros::NodeHandle nh;
@@ -77,8 +76,8 @@ void termSprCb(const std_msgs::Int16 &msg) {
 }
 //照準
 void cmdAngleCb(const std_msgs::Float64 &angle_msg) {
-  pre_target = target;
   target = angle_msg.data;
+ nh.loginfo("recieved angle");  
 }
 void cmdToggleReceiveCb(const std_msgs::Bool &recieve_msg) {
   // tureのとき向かって右、falseのとき向かって左で受け取り体勢
@@ -130,9 +129,9 @@ ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cm
 void separate() {
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
   unsigned long time_now = micros();
-  char buf[100];
-  sprintf(buf, "%d", enc_count);
-  nh.loginfo(buf);
+  // char buf[100];
+  // sprintf(buf, "%d", enc_count);
+  // nh.loginfo(buf);
 #ifdef SPR_DEBUG
   digitalWrite(23, HIGH);
   digitalWrite(24, HIGH);
@@ -263,8 +262,8 @@ void loop() {
   // 分離のDuty決定
   separate();
   // 照準を定める
-  manual_set_position();
-  // pid_set_position();
+  pid_set_position();
+  // manual_set_position();
 
   DC_motor::put(AIM_MOTOR, aim_duty);
 
