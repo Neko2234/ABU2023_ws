@@ -8,8 +8,8 @@
 #include "Cubic.controller.h"
 
 // デバッグ用。LEDでデバッグする際はコメントを外す
-#define SPR_DEBUG
-// #define AIM_DEBUG
+// #define SPR_DEBUG
+#define AIM_DEBUG
 // #define BELT_DEBUG
 
 /*初期状態は下の刃でリングを受け止めている状態を想定*/
@@ -18,14 +18,14 @@
 #define ONE_WAY_COUNT 700    //片道のエンコーダカウント
 #define SPR_STOP_ENC 500000  // 分離で片道を行った後折り返すまでに止まっている時間(us)
 
-#define AIM_ENC 0                      // 照準Absエンコーダ
-#define TARGET_DIFF_THRESH 0.10471973  // 位置PIDか手動かの閾値(rad).この値は6度
-#define ROT_TIME_FIVE 500000           // 照準を5度動かすために必要な時間(us)　**未調整**
-#define REC_POS_R 0                    // 向かって右でリングを受け取るときの角度(rad)　**未調整**
-#define REC_POS_L 0                    // 向かって左でリングを受け取るときの角度(rad)　**未調整**
-#define ROT_TIME_FIVE 1000000          // 照準を5度動かすために必要な時間(us)
+#define AIM_ENC 0              // 照準Absエンコーダ
+#define REC_POS_R 0            // 向かって右でリングを受け取るときの角度(rad)　**未調整**
+#define REC_POS_L 0            // 向かって左でリングを受け取るときの角度(rad)　**未調整**
+#define ROT_SHORT_TIME 500000  //手動照準の最小移動時間(us)
+#define ROT_MIDDLE_TIME 1000000
+#define ROT_LONG_TIME 2000000  //手動照準の最長移動時間
 
-#define SHT_DUTY_BIUS 50 // 射出Dutyにかけるバイアス項
+#define SHT_DUTY_BIUS 50  // 射出Dutyにかけるバイアス項
 
 // DCモータ番号
 #define SHOOT_MOTOR_LU 5  // 左上
@@ -46,11 +46,13 @@ bool spr_is_come_separating = false;    //折り返しから初期位置まで�
 bool spr_is_stopping = false;
 unsigned long spr_stop_start_time = 0;
 // 照準
+int16_t aim_mode;  // 手動照準のモード
 bool is_rotating = false;
 double target = 0;  // 正面　**未調整**
 double pre_target = 0;
 unsigned long rot_start_time = 0;
-int16_t rot_duty = 70;  // 手動で動かすときの照準のDuty　**未調整**
+int16_t rot_duty = 70;       // 手動で動かすときの照準のDuty　**未調整**
+unsigned long rot_time = 0;  //移動する時間を入れる。
 int16_t aim_duty = 0;
 //射出
 bool is_moving_belt = false;
@@ -90,6 +92,9 @@ void cmdAimCb(const std_msgs::Int16 &aim_msg) {
 void cmdToggleLidarCb(const std_msgs::Bool &lidar_msg) {
 }
 // 射出
+void cmdAngleAdjustCb(const std_msgs::Int16 &angle_msg) {
+  aim_mode = angle_msg.data;
+}
 void cmdToggleBeltCb(const std_msgs::Bool &belt_msg) {
   is_moving_belt = belt_msg.data;
 }
@@ -114,23 +119,23 @@ ros::Subscriber<std_msgs::Float64> cmd_angle_sub("cmd_angle", &cmdAngleCb);
 ros::Subscriber<std_msgs::Bool> cmd_toggle_receive_sub("cmd_toggle_receive", &cmdToggleReceiveCb);
 ros::Subscriber<std_msgs::Int16> cmd_aim_sub("cmd_aim", &cmdAimCb);
 // 射出
+ros::Subscriber<std_msgs::Int16> cmd_angle_adjust_sub("cmd_angle_adjust", &cmdAngleAdjustCb);
 ros::Subscriber<std_msgs::Bool> cmd_toggle_belt_sub("cmd_toggle_belt", &cmdToggleBeltCb);
 ros::Subscriber<std_msgs::Int16> term_belt_duty_sub("term_belt_duty", &termBeltDutyCb);
 ros::Subscriber<std_msgs::Int16> cmd_shooting_duty_sub("cmd_shooting_duty", &cmdShootingDutyCb);
 // 緊急停止
 ros::Subscriber<std_msgs::Bool> cmd_emergency_stop_sub("cmd_emergency_stop", &cmdEmergencyStopCb);
 
-void spr_set_duty() {
+void separate() {
   int32_t enc_count = abs(Inc_enc::get(SPR_ENC_NUM));
   unsigned long time_now = micros();
   char buf[100];
-  sprintf(buf,"%d",enc_count);
+  sprintf(buf, "%d", enc_count);
   nh.loginfo(buf);
 #ifdef SPR_DEBUG
   digitalWrite(23, HIGH);
   digitalWrite(24, HIGH);
 #endif
-
   //両方とも真のときは停止してふたつとも偽とする
   if (spr_is_go_separating && !spr_is_come_separating) {
     if (enc_count < ONE_WAY_COUNT) {
@@ -169,7 +174,36 @@ void publish() {
   pub_duty.publish(&duty);
 }
 
-void set_position() {
+void manual_set_position() {
+  unsigned long now_time = micros();
+  unsigned long dt = now_time - rot_start_time;
+
+  if (abs(aim_mode) > 0 && !is_rotating) {
+    if (abs(aim_mode) == 1) rot_time = ROT_SHORT_TIME;
+    else if (abs(aim_mode) == 2) rot_time = ROT_MIDDLE_TIME;
+    else if (abs(aim_mode) == 3) rot_time = ROT_LONG_TIME;
+    else return;
+
+    if (aim_mode > 0) DC_motor::put(AIM_MOTOR, rot_duty);
+    else if (aim_mode < 0) DC_motor::put(AIM_MOTOR, -rot_duty);
+
+    is_rotating = true;
+    rot_start_time = micros();
+#ifdef AIM_DEBUG
+    digitalWrite(23, LOW);
+    digitalWrite(24, LOW);
+#endif
+  } else if (is_rotating && (dt > rot_time)) {
+    DC_motor::put(AIM_MOTOR, 0);
+    is_rotating = false;
+#ifdef AIM_DEBUG
+    digitalWrite(23, HIGH);
+    digitalWrite(24, HIGH);
+#endif
+  }
+}
+
+void pid_set_position() {
   //p項で大きい範囲をある程度の精度で制御できるようになったらi項で最小単位分移動させて精度を高める
   const double capable_duty = 0.1;
   const double Kp = 2.8;
@@ -180,44 +214,6 @@ void set_position() {
   angle.data = positionPID.getCurrent();
   angle.data = radToDeg(angle.data);
   duty.data = DC_motor::get(AIM_MOTOR);
-
-  unsigned long now_time = micros();
-  unsigned long dt = now_time - rot_start_time;
-  double target_diff = target - pre_target;
-
-  if (abs(target_diff) > TARGET_DIFF_THRESH) {
-    positionPID.setTarget(target);
-    positionPID.compute();
-#ifdef AIM_DEBUG
-    digitalWrite(23, HIGH);
-    digitalWrite(24, HIGH);
-#endif
-  } else if (!is_rotating && (target_diff != 0)) {
-    if (target_diff > 0) {
-      DC_motor::put(AIM_MOTOR, rot_duty);
-#ifdef AIM_DEBUG
-      digitalWrite(23, LOW);
-#endif
-    } else if (target_diff < 0) {
-      DC_motor::put(AIM_MOTOR, -rot_duty);
-#ifdef AIM_DEBUG
-      digitalWrite(24, LOW);
-#endif
-    }
-    is_rotating = true;
-    rot_start_time = micros();
-    positionPID.reset();
-  } else if (dt > ROT_TIME_FIVE) {  // 回転している時間が閾値を越えたら止める
-    is_rotating = false;
-    target_diff = 0;
-    pre_target = target;
-    DC_motor::put(AIM_MOTOR, 0);
-    positionPID.reset();
-#ifdef AIM_DEBUG
-    digitalWrite(23, HIGH);
-    digitalWrite(24, HIGH);
-#endif
-  }
 }
 
 void setup() {
@@ -263,9 +259,10 @@ void loop() {
 #endif
 
   // 分離のDuty決定
-  spr_set_duty();
+  separate();
   // 照準を定める
-  // set_position();
+  manual_set_position();
+  // pid_set_position();
 
   DC_motor::put(AIM_MOTOR, aim_duty);
 
