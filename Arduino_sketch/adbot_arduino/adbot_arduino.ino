@@ -241,6 +241,7 @@ void setup() {
   nh.subscribe(term_spr_sub);
   nh.subscribe(cmd_shooting_duty_sub);
   nh.subscribe(cmd_angle_sub);
+  nh.subscribe(cmd_angle_adjust_sub);
   nh.subscribe(cmd_aim_sub);
   nh.subscribe(cmd_toggle_receive_sub);
   nh.subscribe(cmd_toggle_belt_sub);
